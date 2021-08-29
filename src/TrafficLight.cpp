@@ -16,9 +16,11 @@ T MessageQueue<T>::receive()
 
     _condition.wait(lck, [this]{return !_queue.empty(); });
 
-    T returnVal = std::move(_queue.front());
+    //get latest value
+    T returnVal = std::move(_queue.back());
 
-    _queue.pop_front();
+    //remove everything else
+    _queue.clear();
 
     return returnVal;
 }
@@ -62,7 +64,7 @@ void TrafficLight::waitForGreen()
 
 TrafficLightPhase TrafficLight::getCurrentPhase()
 {
-    std::unique_lock<std::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
 
     return _currentPhase;
 }
@@ -99,7 +101,12 @@ void TrafficLight::cycleThroughPhases()
                             _currentPhase = TrafficLightPhase::green : 
                             _currentPhase = TrafficLightPhase::red;
 
+            auto pre = _currentPhase;
+
             _msgQueue.send(std::move(_currentPhase));
+
+            if(pre != _currentPhase)
+                std::cout << "Light#" << getID() << " phase conflict: " << pre << " " << _currentPhase  << std::endl;
 
             // reset stop watch for next cycle
             lastUpdate = std::chrono::system_clock::now();
